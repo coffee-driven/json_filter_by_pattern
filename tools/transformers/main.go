@@ -3,20 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"reflect"
+	"os"
 
 	"go.uber.org/zap"
 )
 
-type SearchPatterns struct {
-	patterns map[string]string
-}
-
-func (sp *SearchPatterns) newSearchPatterns(patterns map[string]string) *SearchPatterns {
-	p := SearchPatterns{patterns: patterns}
-	return &p
+type Patterns struct {
+	NamePattern        string `json:"name_pattern"`
+	PricePattern       string `json:"price_pattern"`
+	DescriptionPattern string `json:"description_pattern"`
 }
 
 type Product struct {
@@ -36,33 +32,19 @@ func NewProduct() *Product {
 }
 
 func (p *Product) FilterJsonToProductByPatterns(json_data map[string]interface{},
-	patterns SearchPatterns) *Product {
+	patterns Patterns) *Product {
 
 	for key, value := range json_data {
-		for pattern_key, pattern_value := range patterns.patterns {
+		switch key {
+		case patterns.NamePattern:
+			p.Product_name = value.(string)
+		case patterns.DescriptionPattern:
+			p.Product_description = value.(string)
+		case patterns.PricePattern:
+			p.Product_price = value.(float64)
+		default:
+			fmt.Printf("Key not matching any of the patterns")
 
-			if key == pattern_value {
-
-				switch typeof := reflect.TypeOf(value).Kind(); typeof {
-				case reflect.Float64:
-					value_typed := value.(float64)
-					p.Product_price = value_typed
-				case reflect.String:
-					value_typed := value.(string)
-
-					switch pattern_key {
-					case "Product_name":
-						p.Product_name = value_typed
-					case "Product_description":
-						p.Product_description = value_typed
-					default:
-						fmt.Println("Unknown pattern")
-					}
-
-				default:
-					fmt.Println("Unknown data type in JSON file")
-				}
-			}
 		}
 	}
 
@@ -84,7 +66,7 @@ func NewProductList() *ProductList {
 }
 
 func (pl *ProductList) UpdateProductList(json_data []map[string]interface{},
-	search_patterns SearchPatterns) *ProductList {
+	search_patterns Patterns) *ProductList {
 
 	for _, product := range json_data {
 		p := NewProduct()
@@ -108,17 +90,31 @@ func main() {
 
 	sugar.Info("Hello from zap logger")
 
-	var sp SearchPatterns
+	// Load patterns
+	var patterns_struct Patterns
+	var patterns_file string = "patterns.json"
 
-	my_patterns := make(map[string]string)
-	my_patterns["Product_name"] = "Name"
-	my_patterns["Product_price"] = "PSPrice"
-	my_patterns["Product_description"] = "Notes"
+	patterns, err := os.ReadFile(patterns_file)
+	if err != nil {
+		sugar.Error("Error reading pattern file")
+	}
 
-	patterns := sp.newSearchPatterns(my_patterns)
+	if err := json.Unmarshal(patterns, &patterns_struct); err != nil {
+		sugar.Error("Error unmarshaling pattern file")
+	}
 
+	/*
+		my_patterns := make(map[string]string)
+		my_patterns["Product_name"] = "Name"
+		my_patterns["Product_price"] = "PSPrice"
+		my_patterns["Product_description"] = "Notes"
+
+		patterns := sp.newSearchPatterns(my_patterns)
+	*/
+
+	// Load data
 	var file_name string = "data.json"
-	jsonData, err := ioutil.ReadFile(file_name)
+	jsonData, err := os.ReadFile(file_name)
 	if err != nil {
 		sugar.Error("Couldn't read file: %s", file_name)
 	}
@@ -127,8 +123,9 @@ func main() {
 		fmt.Printf("Unmarshal failed %s", err)
 	}
 
+	// Create convention product list
 	pl := NewProductList()
-	product_list := pl.UpdateProductList(data, *patterns)
+	product_list := pl.UpdateProductList(data, patterns_struct)
 
 	fmt.Println(product_list)
 }

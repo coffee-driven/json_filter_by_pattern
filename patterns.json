@@ -1,0 +1,5 @@
+{
+    "name_pattern": "name",
+    "price_pattern": "price",
+    "description_pattern": "notes"
+}

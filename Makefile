@@ -7,4 +7,3 @@ build: clean
 	@echo build
 	cd tools/transformers && \
 	go build -o ../../build/ . ;
-
